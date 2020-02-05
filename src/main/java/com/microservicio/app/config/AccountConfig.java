@@ -1,4 +1,4 @@
-package com.microservicio.app.client;
+package com.microservicio.app.config;
 
 
 import java.util.HashMap;
@@ -21,8 +21,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
-public class AccountClient {
-	private static final Logger LOGGER = LoggerFactory.getLogger(AccountClient.class);
+public class AccountConfig {
+	private static final Logger LOGGER = LoggerFactory.getLogger(AccountConfig.class);
 	
 	@Autowired
 	@Qualifier("account")

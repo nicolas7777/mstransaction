@@ -1,4 +1,4 @@
-package com.microservicio.app.implement;
+package com.microservicio.app.service;
 
 import java.net.URI;
 import java.text.DateFormat;
@@ -22,14 +22,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import com.microservicio.app.client.AccountClient;
-import com.microservicio.app.client.ClientClient;
+import com.microservicio.app.config.AccountConfig;
+import com.microservicio.app.config.ClientConfig;
+import com.microservicio.app.dao.TransactionDao;
 import com.microservicio.app.document.Transaction;
 import com.microservicio.app.dto.AccountDto;
 import com.microservicio.app.dto.ClientDto;
 import com.microservicio.app.dto.InterbanktransactionDto;
-import com.microservicio.app.repository.TransactionRepository;
-import com.microservicio.app.service.ITransactionService;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -39,18 +38,16 @@ public class TransactionServiceImpl implements ITransactionService{
 	private static final Logger LOGGER = LoggerFactory.getLogger(TransactionServiceImpl.class);
 	
 	@Autowired
-	private AccountClient accountClient;
+	private AccountConfig accountConfig;
+
 	
 	@Autowired
-	private ClientClient clientClient;
-	
-	@Autowired
-	private TransactionRepository transactionRepository;
+	private TransactionDao transactionDao;
 
 	@Override
 	public Mono<Transaction> updateByIdtransaction(String idtransaction,  Transaction transaction) {
 		//LOGGER.info("TransactionServiceImpl");		
-			return this.transactionRepository
+			return this.transactionDao
 					.findByIdtransaction(idtransaction)
 					.map(p->
 						new Transaction (
@@ -68,39 +65,39 @@ public class TransactionServiceImpl implements ITransactionService{
 								))
 												
 					
-					.flatMap(this.transactionRepository::save);
+					.flatMap(this.transactionDao::save);
 					
 	}
 
 	@Override
 	public Mono<AccountDto> deleteByIdtransaction(String idtransaction) {
 		//LOGGER.info("TransactionServiceImpl");
-		return this.transactionRepository
+		return this.transactionDao
 				.findByIdtransaction(idtransaction)
 				.map(p->{					
 						p.setStatus("DELETED");
 						return p;
 				})
-				.flatMap(this.transactionRepository::save)				
+				.flatMap(this.transactionDao::save)				
 				.flatMap(p->{if(p.getKindtransaction()==("RETIREMENT") && p.getStatus()==("ENABLED") ) {					
-					return this.accountClient.updateDeposit(p);
+					return this.accountConfig.updateDeposit(p);
 				}else if(p.getKindtransaction()==("DEPOSIT") && p.getStatus()==("ENABLED")) {
-					return this.accountClient.updateRetirement(p);
+					return this.accountConfig.updateRetirement(p);
 				}else 
 					p.setAmount(0.0);
-					return this.accountClient.updateRetirement(p);
+					return this.accountConfig.updateRetirement(p);
 				  })
 				;
 	}
 
 	@Override
 	public Mono<AccountDto> createdeposit (Transaction transaction) {	
-		return this.accountClient.getNumbereDepositByAccountcode(transaction.getAccountcode())
+		return this.accountConfig.getNumbereDepositByAccountcode(transaction.getAccountcode())
 		.flatMap(q->{			
 			//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
 			if(q.getNumberdeposit()<=0) {
 				
-				return this.transactionRepository.save(new Transaction (
+				return this.transactionDao.save(new Transaction (
 						//transaction.getBankname(),
 //						transaction.getKindaccount(),
 						UUID.randomUUID().toString(),
@@ -114,12 +111,12 @@ public class TransactionServiceImpl implements ITransactionService{
 						""
 						))
 						.flatMap(p -> {							
-							return this.accountClient.updateDeposit(p);
+							return this.accountConfig.updateDeposit(p);
 						});	
 			}
 			else
 			{
-				return this.transactionRepository.save(new Transaction (
+				return this.transactionDao.save(new Transaction (
 //						transaction.getBankname(),
 //						transaction.getKindaccount(),
 						UUID.randomUUID().toString(),
@@ -133,7 +130,7 @@ public class TransactionServiceImpl implements ITransactionService{
 						""//transaction.getBankname()
 						))
 						.flatMap(p -> {					
-							return this.accountClient.updateDeposit(p);
+							return this.accountConfig.updateDeposit(p);
 						});	
 			}
 		});
@@ -143,11 +140,11 @@ public class TransactionServiceImpl implements ITransactionService{
 	@Override
 	public Mono<AccountDto> createretirement (Transaction transaction) {	
 		
-		return this.accountClient.getNumbereDepositByAccountcode(transaction.getAccountcode())
+		return this.accountConfig.getNumbereDepositByAccountcode(transaction.getAccountcode())
 				.flatMap(q->{
 					//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
 					if(q.getNumberretirement()<=0) {						
-							return this.transactionRepository.save(new Transaction (
+							return this.transactionDao.save(new Transaction (
 											//transaction.getBankname(),
 //											transaction.getKindaccount(),
 											UUID.randomUUID().toString(),	
@@ -161,12 +158,12 @@ public class TransactionServiceImpl implements ITransactionService{
 											""//transaction.getBankname()
 											))
 											.flatMap(p -> {					
-												return this.accountClient.updateRetirement(p);
+												return this.accountConfig.updateRetirement(p);
 											});
 					}
 					else
 					{
-							return this.transactionRepository.save(new Transaction (
+							return this.transactionDao.save(new Transaction (
 								//transaction.getBankname(),
 //								transaction.getKindaccount(),
 								UUID.randomUUID().toString(),	
@@ -180,7 +177,7 @@ public class TransactionServiceImpl implements ITransactionService{
 								""//transaction.getBankname()
 								))
 								.flatMap(p -> {					
-									return this.accountClient.updateRetirement(p);
+									return this.accountConfig.updateRetirement(p);
 								});
 					}
 				});
@@ -191,7 +188,7 @@ public class TransactionServiceImpl implements ITransactionService{
 
 	@Override
 	public Flux<Transaction> findAll() {
-		return this.transactionRepository.findAll();
+		return this.transactionDao.findAll();
 	}
 	
 	
@@ -199,13 +196,13 @@ public class TransactionServiceImpl implements ITransactionService{
 	public Mono<AccountDto> interbanktransaction(InterbanktransactionDto interbanktransactionDto) {
 		double dinterbanktransactionDto=5;		
 		//buscamos la cuenta en las cuentas para ver si existe	
-		return this.accountClient.findByAccountCode(interbanktransactionDto.getAccountcode())
+		return this.accountConfig.findByAccountCode(interbanktransactionDto.getAccountcode())
 			.flatMap(q->{	
 				if(q == null) {
 					return Mono.error(new InterruptedException("ERROR"));
 				}
 				else {				
-					return this.transactionRepository.save(new Transaction (
+					return this.transactionDao.save(new Transaction (
 							//"BBC poner el bando de account bank",
 //							"--",
 							UUID.randomUUID().toString(),	
@@ -219,17 +216,17 @@ public class TransactionServiceImpl implements ITransactionService{
 							interbanktransactionDto.getAccountcode()
 							))
 							.flatMap(p -> {					
-								return this.accountClient.updateinterbanktransaction(p)
+								return this.accountConfig.updateinterbanktransaction(p)
 										.flatMap(w->{
 											
 											//Start the deposit			
-											return this.accountClient.findByAccountCode(interbanktransactionDto.getDestinationaccountcode())
+											return this.accountConfig.findByAccountCode(interbanktransactionDto.getDestinationaccountcode())
 													.flatMap(rr->{	
 														if(rr == null) {
 															return Mono.error(new InterruptedException("ERROR"));
 														}
 														else {				
-															return this.transactionRepository.save(new Transaction (
+															return this.transactionDao.save(new Transaction (
 																	//"BBC poner el bando de account bank",
 //																	"--",
 																	UUID.randomUUID().toString(),	
@@ -243,7 +240,7 @@ public class TransactionServiceImpl implements ITransactionService{
 																	interbanktransactionDto.getAccountcode()
 																	))
 																	.flatMap(ss -> {					
-																		return this.accountClient.updateinterbanktransaction(ss);
+																		return this.accountConfig.updateinterbanktransaction(ss);
 																	});					
 														}
 													});
@@ -258,7 +255,7 @@ public class TransactionServiceImpl implements ITransactionService{
 
 	@Override
 	public Mono<Transaction> create(Transaction transaction) {
-		return this.transactionRepository.save(new Transaction (
+		return this.transactionDao.save(new Transaction (
 				//transaction.getBankname(),
 //				transaction.getKindaccount(),
 				transaction.getIdtransaction(),

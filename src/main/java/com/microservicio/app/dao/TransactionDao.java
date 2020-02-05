@@ -1,4 +1,4 @@
-package com.microservicio.app.repository;
+package com.microservicio.app.dao;
 
 import java.util.List;
 
@@ -10,7 +10,7 @@ import com.microservicio.app.document.Transaction;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public interface TransactionRepository extends ReactiveMongoRepository<Transaction,String> {
+public interface TransactionDao extends ReactiveMongoRepository<Transaction,String> {
 	
 	//@Query(value = "{'idtransaction' : ?0}")
 	public Mono<Transaction> findByIdtransaction(String idtransaction);
