@@ -20,14 +20,8 @@ import lombok.ToString;
 @Document(collection="transaction")
 @ToString
 public class Transaction {
-//	@NotNull
-//	@Size(min = 8, max = 20)
-//	private String bankname;
-//	@NotNull
-//	@Size(min = 8, max = 20)
-//	private String kindaccount;
 	@Id
-	private String idtransaction;
+	private String id;
 	@NotNull
 	private String accountcode;
 	@NotNull
@@ -35,14 +29,11 @@ public class Transaction {
 	@NotNull
 	@Size(min = 8, max = 20)
 	private String status;
-	@NotNull
+	@NotNull	
 	private Date date; 
-//	@NotNull
-//	private Double percent;
 	@NotNull
 	private String kindtransaction;
 	@NotNull
 	private Double commission;
-	//@NotNull
 	private String destinationaccountcode;
 }

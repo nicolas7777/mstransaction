@@ -23,6 +23,7 @@ import com.microservicio.app.document.Transaction;
 import com.microservicio.app.dto.AccountDto;
 import com.microservicio.app.dto.ClientDto;
 import com.microservicio.app.dto.InterbanktransactionDto;
+import com.microservicio.app.dto.PeriodDto;
 import com.microservicio.app.service.ITransactionService;
 
 import io.swagger.annotations.ApiOperation;
@@ -85,6 +86,18 @@ public class TransactionController {
 	Mono<Transaction> create(@RequestBody Transaction transaction){
 		//LOGGER.info("TransactionController");		
 		return this.transactionService.create(transaction);
-	}	
+	}
+	
+	@PostMapping("/findbydateforfeescharged")
+	@ApiOperation(value = "Find by date for fees charged", notes="")	
+	Flux<Transaction> findByDateforFeesCharged(@RequestBody PeriodDto periodDto ){
+		//LOGGER.info("TransactionController");
+		return this.transactionService.findByDateforFeesCharged(periodDto);
+	}
+	
+	
+	
+	
+	
 	
 }

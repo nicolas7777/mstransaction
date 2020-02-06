@@ -1,5 +1,6 @@
 package com.microservicio.app.dao;
 
+import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.mongodb.repository.Query;
@@ -11,9 +12,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface TransactionDao extends ReactiveMongoRepository<Transaction,String> {
-	
-	//@Query(value = "{'idtransaction' : ?0}")
-	public Mono<Transaction> findByIdtransaction(String idtransaction);
+		
+	@Query(value = "'date' : {'$gte' : ?0, '$lte' : ?1}")
+	public Flux<Transaction> findByDateforFeesCharged(String startdate, String endingdate);
 	
 }
 

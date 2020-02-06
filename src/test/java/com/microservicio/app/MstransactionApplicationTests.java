@@ -1,5 +1,7 @@
 package com.microservicio.app;
 
+import java.util.UUID;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
@@ -30,17 +32,17 @@ class MstransactionApplicationTests {
 	//CRUD:save
 		@Test
 		void saveBank() {
-				mongoTemplate.dropCollection("transaction").subscribe();
+				//mongoTemplate.dropCollection("transaction").subscribe();
 				//String sUUID = UUID.randomUUID().toString();
 				Transaction transaction = new Transaction(				
-						"11111111111111111111",// idtransaction;
-						"AAAAAA",//accountcode
+						"TRX"+UUID.randomUUID().toString(),// idtransaction;
+						"ACC"+UUID.randomUUID().toString(),//accountcode
 						10.0,// amount;					
 						"OK", //status					
 						null, //date					
 						"DEPOSIT", //kindtransaction;					
 						0.8,// commission;	
-						"BBBBBB"
+						""
 						);
 				webTestClient.post()
 				.uri("/transaction/create")
@@ -52,7 +54,7 @@ class MstransactionApplicationTests {
 					Transaction transactionres = response.getResponseBody();
 					System.out.println("[Cliente registrado] " + transaction);
 					//Assertions.assertThat(clientres.getId()).isNotNull().isEqualTo(sUUID);			
-					Assertions.assertThat(transactionres.getIdtransaction()).isNotNull().isEqualTo("11111111111111111111");
+					Assertions.assertThat(transactionres.getId()).isNotNull().isEqualTo("11111111111111111111");
 					Assertions.assertThat(transactionres.getAccountcode()).isNotNull().isEqualTo("AAAAAA");
 					Assertions.assertThat(transactionres.getAmount()).isNotNull().isEqualTo(10.0);
 					Assertions.assertThat(transactionres.getStatus()).isNotNull().isEqualTo("OK");

@@ -2,6 +2,9 @@ package com.microservicio.app.service;
 
 import java.net.URI;
 import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -29,6 +32,8 @@ import com.microservicio.app.document.Transaction;
 import com.microservicio.app.dto.AccountDto;
 import com.microservicio.app.dto.ClientDto;
 import com.microservicio.app.dto.InterbanktransactionDto;
+import com.microservicio.app.dto.PeriodDto;
+
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -45,15 +50,15 @@ public class TransactionServiceImpl implements ITransactionService{
 	private TransactionDao transactionDao;
 
 	@Override
-	public Mono<Transaction> updateByIdtransaction(String idtransaction,  Transaction transaction) {
+	public Mono<Transaction> updateByIdtransaction(String id,  Transaction transaction) {
 		//LOGGER.info("TransactionServiceImpl");		
 			return this.transactionDao
-					.findByIdtransaction(idtransaction)
+					.findById(id)
 					.map(p->
 						new Transaction (
 								//transaction.getBankname(),
 //								transaction.getKindaccount(),
-								transaction.getIdtransaction(),
+								transaction.getId(),
 								transaction.getAccountcode(),		
 								transaction.getAmount(),
 								transaction.getStatus(),
@@ -70,68 +75,82 @@ public class TransactionServiceImpl implements ITransactionService{
 	}
 
 	@Override
-	public Mono<AccountDto> deleteByIdtransaction(String idtransaction) {
+	public Mono<AccountDto> deleteByIdtransaction(String id) {
 		//LOGGER.info("TransactionServiceImpl");
 		return this.transactionDao
-				.findByIdtransaction(idtransaction)
-				.map(p->{					
-						p.setStatus("DELETED");
-						return p;
-				})
-				.flatMap(this.transactionDao::save)				
-				.flatMap(p->{if(p.getKindtransaction()==("RETIREMENT") && p.getStatus()==("ENABLED") ) {					
-					return this.accountConfig.updateDeposit(p);
-				}else if(p.getKindtransaction()==("DEPOSIT") && p.getStatus()==("ENABLED")) {
-					return this.accountConfig.updateRetirement(p);
-				}else 
-					p.setAmount(0.0);
-					return this.accountConfig.updateRetirement(p);
-				  })
-				;
+				.findById(id)
+				.map( p->{
+					p.setStatus("DELETED");
+					return p;})
+				.flatMap(this.transactionDao::save)
+				.flatMap(p->{
+						return Mono.error(new InterruptedException("SE ELIMINO EL TRX"));
+				  });
+				
 	}
 
 	@Override
 	public Mono<AccountDto> createdeposit (Transaction transaction) {	
 		return this.accountConfig.getNumbereDepositByAccountcode(transaction.getAccountcode())
-		.flatMap(q->{			
-			//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
-			if(q.getNumberdeposit()<=0) {
-				
-				return this.transactionDao.save(new Transaction (
-						//transaction.getBankname(),
-//						transaction.getKindaccount(),
-						UUID.randomUUID().toString(),
-						transaction.getAccountcode(),												
-						q.getAmount() + (transaction.getAmount()-( transaction.getAmount() * q.getCommission())),//transaction.getAmount(),
-						"OK",
-						new Date(),
-//						transaction.getPercent(),
-						"DEPOSIT",
-						(transaction.getAmount() * q.getCommission()),
-						""
-						))
-						.flatMap(p -> {							
-							return this.accountConfig.updateDeposit(p);
-						});	
+		.flatMap(q->{
+			
+			if(q.getKindaccount().equals("SAVINGS ACCOUNT") ||q.getKindaccount().equals("CURRENT ACCOUNT")||q.getKindaccount().equals("FIXED TERM ACCOUNT") ) {
+				//Cuentas bancarias
+				//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
+				if(q.getNumberdeposit()<=0) {					
+					return this.transactionDao.save(new Transaction (
+							"TRX"+UUID.randomUUID().toString(),
+							transaction.getAccountcode(),												
+							q.getAmount() + (transaction.getAmount()-( transaction.getAmount() * q.getCommission())),//transaction.getAmount(),
+							"OK",
+							new Date(),
+							"DEPOSIT",
+							(transaction.getAmount() * q.getCommission()),
+							""
+							))
+							.flatMap(p -> {							
+								return this.accountConfig.updateDeposit(p);
+							});	
+				}
+				else
+				{
+					return this.transactionDao.save(new Transaction (
+							"TRX"+UUID.randomUUID().toString(),
+							transaction.getAccountcode(),												
+							q.getAmount() + transaction.getAmount(),//transaction.getAmount(),,
+							"OK",
+							new Date(),
+							"DEPOSIT",
+							0.0,
+							""
+							))
+							.flatMap(p -> {					
+								return this.accountConfig.updateDeposit(p);
+							});	
+				}
 			}
 			else
 			{
-				return this.transactionDao.save(new Transaction (
-//						transaction.getBankname(),
-//						transaction.getKindaccount(),
-						UUID.randomUUID().toString(),
-						transaction.getAccountcode(),												
-						q.getAmount(),//transaction.getAmount(),,
-						"OK",
-						new Date(),
-//						transaction.getPercent(),
-						"DEPOSIT",
-						0.0,
-						""//transaction.getBankname()
-						))
-						.flatMap(p -> {					
-							return this.accountConfig.updateDeposit(p);
-						});	
+				//Cuentas credito no se le aplica los descuentos 
+				//En caso de que se supere el numero de depositos llegue a cero le cobrara comision				
+				if((q.getAmount()-transaction.getAmount())>=0)
+				{
+					return this.transactionDao.save(new Transaction (
+							"TRX"+UUID.randomUUID().toString(),
+							transaction.getAccountcode(),												
+							q.getAmount() - transaction.getAmount(),//transaction.getAmount(),,
+							"OK",
+							new Date(),
+							"DEPOSIT",
+							0.0,
+							""
+							))
+							.flatMap(p -> {					
+								return this.accountConfig.updateDeposit(p);
+							});	
+				}
+				else 
+					return Mono.error(new InterruptedException("NO PUEDE PAGAR MAS DE SU DEUDA"));
 			}
 		});
 			
@@ -142,44 +161,76 @@ public class TransactionServiceImpl implements ITransactionService{
 		
 		return this.accountConfig.getNumbereDepositByAccountcode(transaction.getAccountcode())
 				.flatMap(q->{
-					//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
-					if(q.getNumberretirement()<=0) {						
-							return this.transactionDao.save(new Transaction (
-											//transaction.getBankname(),
-//											transaction.getKindaccount(),
-											UUID.randomUUID().toString(),	
-											transaction.getAccountcode(),											
-											q.getAmount() - (transaction.getAmount()-( transaction.getAmount() * q.getCommission())),//transaction.getAmount(),
-											"OK",
-											new Date(),
-//											transaction.getPercent(),
-											"RETIREMENT",
-											(transaction.getAmount() * q.getCommission()),
-											""//transaction.getBankname()
-											))
-											.flatMap(p -> {					
-												return this.accountConfig.updateRetirement(p);
-											});
+					if(q.getKindaccount().equals("SAVINGS ACCOUNT") ||q.getKindaccount().equals("CURRENT ACCOUNT")||q.getKindaccount().equals("FIXED TERM ACCOUNT") ) {
+						//Cuentas bancarias
+						//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
+						//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
+						if(q.getNumberretirement()<=0 && q.getAmount()>=transaction.getAmount() ) {						
+								return this.transactionDao.save(new Transaction (
+												//transaction.getBankname(),
+//												transaction.getKindaccount(),
+												"TRX"+UUID.randomUUID().toString(),	
+												transaction.getAccountcode(),											
+												q.getAmount() - (transaction.getAmount()-( transaction.getAmount() * q.getCommission())),//transaction.getAmount(),
+												"OK",
+												new Date(),
+//												transaction.getPercent(),
+												"RETIREMENT",
+												(transaction.getAmount() * q.getCommission()),
+												""//transaction.getBankname()
+												))
+												.flatMap(p -> {					
+													return this.accountConfig.updateRetirement(p);
+												});
+						}
+						else if(q.getNumberretirement()>0 && q.getAmount()>=transaction.getAmount())
+						{
+								return this.transactionDao.save(new Transaction (
+									//transaction.getBankname(),
+//									transaction.getKindaccount(),
+									"TRX"+UUID.randomUUID().toString(),	
+									transaction.getAccountcode(),											
+									q.getAmount() - transaction.getAmount(),
+									"OK",
+									new Date(),
+//									transaction.getPercent(),
+									"RETIREMENT",
+									0.0,
+									""//transaction.getBankname()
+									))
+									.flatMap(p -> {					
+										return this.accountConfig.updateRetirement(p);
+									});
+						}
+						else {
+							return Mono.error(new InterruptedException("NO SE PUEDE HACER ESTA OPERACION"));
+						}
 					}
-					else
-					{
-							return this.transactionDao.save(new Transaction (
-								//transaction.getBankname(),
-//								transaction.getKindaccount(),
-								UUID.randomUUID().toString(),	
-								transaction.getAccountcode(),											
-								transaction.getAmount(),
-								"OK",
-								new Date(),
-//								transaction.getPercent(),
-								"RETIREMENT",
-								0.0,
-								""//transaction.getBankname()
-								))
-								.flatMap(p -> {					
-									return this.accountConfig.updateRetirement(p);
-								});
+					else {
+						//En caso de que se supere el numero de depositos llegue a cero le cobrara comision
+						if(( q.getAmount()+transaction.getAmount())<=q.getLimit()) {						
+								return this.transactionDao.save(new Transaction (
+												//transaction.getBankname(),
+//												transaction.getKindaccount(),
+												"TRX"+UUID.randomUUID().toString(),	
+												transaction.getAccountcode(),											
+												q.getAmount() + (transaction.getAmount()),//transaction.getAmount(),
+												"OK",
+												new Date(),
+//												transaction.getPercent(),
+												"RETIREMENT",
+												0.0,
+												""//transaction.getBankname()
+												))
+												.flatMap(p -> {					
+													return this.accountConfig.updateRetirement(p);
+												});
+						}						
+						else 
+							return Mono.error(new InterruptedException("NO PUEDE RETIRAR MAS DE SU LIMITE"));
 					}
+					
+					
 				});
 					
 
@@ -205,7 +256,7 @@ public class TransactionServiceImpl implements ITransactionService{
 					return this.transactionDao.save(new Transaction (
 							//"BBC poner el bando de account bank",
 //							"--",
-							UUID.randomUUID().toString(),	
+							"TRX"+UUID.randomUUID().toString(),	
 							interbanktransactionDto.getAccountcode(),										
 							q.getAmount() - (interbanktransactionDto.getAmount()),//transaction.getAmount(),
 							"OK",
@@ -258,7 +309,7 @@ public class TransactionServiceImpl implements ITransactionService{
 		return this.transactionDao.save(new Transaction (
 				//transaction.getBankname(),
 //				transaction.getKindaccount(),
-				transaction.getIdtransaction(),
+				transaction.getId(),
 				transaction.getAccountcode(),												
 				transaction.getAmount(),
 				transaction.getStatus(),
@@ -269,6 +320,15 @@ public class TransactionServiceImpl implements ITransactionService{
 				transaction.getDestinationaccountcode()				
 				));	
 	}
+
+	@Override
+	public Flux<Transaction> findByDateforFeesCharged(PeriodDto periodDto) {
+   
+
+			return this.transactionDao
+					   .findByDateforFeesCharged(periodDto.getStartdate().toString(),periodDto.getEndingdate().toString());
+		
+	}	
 }
 
 

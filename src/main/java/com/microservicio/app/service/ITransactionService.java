@@ -9,18 +9,20 @@ import com.microservicio.app.document.Transaction;
 import com.microservicio.app.dto.AccountDto;
 import com.microservicio.app.dto.ClientDto;
 import com.microservicio.app.dto.InterbanktransactionDto;
+import com.microservicio.app.dto.PeriodDto;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface ITransactionService {
-	public Mono<Transaction> updateByIdtransaction(String idtransaction,  Transaction transaction);
-	public Mono<AccountDto> deleteByIdtransaction(String idtransaction);	
+	public Mono<Transaction> updateByIdtransaction(String id,  Transaction transaction);
+	public Mono<AccountDto> deleteByIdtransaction(String id);	
 	public Mono<AccountDto> createdeposit (Transaction transaction);
 	public Mono<AccountDto> createretirement (Transaction transaction);
 	public Flux<Transaction> findAll ();
 	public Mono<AccountDto> interbanktransaction(InterbanktransactionDto interbanktransactionDto);
-	Mono<Transaction> create(Transaction transaction);
+	public Mono<Transaction> create(Transaction transaction);
+	public Flux<Transaction> findByDateforFeesCharged (PeriodDto periodDto);
 	
 }
  
